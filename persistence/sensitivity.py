@@ -9,14 +9,19 @@ from persistence.survival import curve, share_at
 
 GAPS, LOOKBACKS, LOOKFORWARDS = (30, 60, 90), (182, 365, 730), (0, 182, 365)
 KEYS = ("gap", "lookback", "lookforward")
+MONTHS = {1: 30, 3: 91, 6: 182, 9: 274, 12: 365}
 
 
-# Runs one rule setting: funnel, naive and Kaplan-Meier six-month share, and the curve.
+# Runs one rule setting: funnel, six-month counts, Kaplan-Meier at each milestone month, and the curve.
 def run(fills, enrolment, rules):
     cohort, funnel = build_cohort(fills, enrolment, rules)
+    early = cohort.days_on < rules.horizon
     return {"gap": rules.gap, "lookback": rules.lookback, "lookforward": rules.lookforward,
             "patients": len(cohort), "funnel": funnel,
+            "on_6m": int((~early).sum()), "stopped_6m": int((early & cohort.stopped).sum()),
+            "censored_6m": int((early & ~cohort.stopped).sum()),
             "naive_6m": round(persistent_share(cohort), 4), "km_6m": round(share_at(cohort), 4),
+            "km_months": {m: round(share_at(cohort, d), 4) for m, d in MONTHS.items()},
             "curve": curve(cohort)}
 
 
@@ -33,12 +38,15 @@ def one_at_a_time(results):
             if all(r[o] == getattr(base, o) for o in KEYS if o != k)]
 
 
-# Builds the full results file, including how many prescriptions were never filled.
+# Builds the full results file, including dataset counts and how many prescriptions were never filled.
 def save(folder="data"):
     fills, enrolment, rx = load(folder)
     results = grid(fills, enrolment)
+    never = ~rx.patient_id.isin(fills.patient_id)
     out = {"original": {k: getattr(Rules(), k) for k in KEYS},
-           "never_filled_share": round(float((~rx.patient_id.isin(fills.patient_id)).mean()), 4),
+           "dataset": {"patients": len(enrolment), "fills": len(fills), "prescriptions": len(rx),
+                       "never_filled": int(never.sum())},
+           "never_filled_share": round(float(never.mean()), 4),
            "one_at_a_time": one_at_a_time(results), "runs": results}
     Path(folder, "results.json").write_text(json.dumps(out))
     return out

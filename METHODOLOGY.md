@@ -6,6 +6,10 @@ This is the plain-language write-up of the method that was never written down. E
 
 Synthetic pharmacy claims for 5,000 patients on one treatment-resistant depression drug, covering 2021 to 2024. Each claim records the patient, the date the prescription was filled and how many days of medicine it covered (30 or 90). A separate table records when each patient's insurance started and ended. A third table records prescriptions written by doctors, including ones that were never filled. The data is synthetic, so it shows how the rules behave, not the brand's real numbers.
 
+## [X1] The reported 68%
+
+The number given to leadership 18 months ago was 68% of patients persistent at 6 months, from the original method (gap 60 days, 12 months of look-back, 12 months of look-forward). We could not rerun it on the real claims, so we rebuilt the same rules on synthetic data; the rebuild gives a number close to it (see S-60-365-365). Whether 68% is "right" depends on which rules you accept: it is a correct answer to a narrow question (stable, insured, new patients, allowing 60-day gaps), not to "how many patients who are prescribed the drug stay on it".
+
 ## [R1] Index date: the first fill
 
 A patient's analysis starts on the date of their first fill of the drug that we can see in the claims. Everything after is measured from this day.
