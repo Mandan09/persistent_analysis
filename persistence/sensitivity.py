@@ -7,7 +7,7 @@ from persistence.cohort import Rules, build_cohort, persistent_share
 from persistence.generate import load
 from persistence.survival import curve, share_at
 
-GAPS, LOOKBACKS, LOOKFORWARDS = (30, 60, 90), (182, 365, 730), (0, 182, 365)
+GAPS, LOOKBACKS, LOOKFORWARDS = (15, 30, 45, 60, 75, 90, 120), (182, 365, 730), (0, 91, 182, 274, 365)
 KEYS = ("gap", "lookback", "lookforward")
 MONTHS = {1: 30, 3: 91, 6: 182, 9: 274, 12: 365}
 

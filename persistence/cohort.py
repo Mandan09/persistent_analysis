@@ -18,6 +18,11 @@ def days(n):
     return pd.Timedelta(int(n), unit="D")
 
 
+# Days as a readable month count: 365 -> "12 months".
+def months(n):
+    return f"{round(n / 30.4)} months"
+
+
 # R1: each patient's index date is their first observed fill.
 def index_dates(fills):
     return fills.groupby("patient_id").fill_date.min().rename("index_date")
@@ -38,13 +43,14 @@ def days_on_therapy(fills, index, follow_end, gap):
 # Applies R1-R3, measures R4 for everyone kept, and returns the cohort plus patient counts after each rule.
 def build_cohort(fills, enrolment, rules=Rules()):
     fills = fills.sort_values(["patient_id", "fill_date"])
-    funnel = [("All enrolled patients", len(enrolment))]
+    funnel = [("All patients", len(enrolment))]
     df = enrolment.join(index_dates(fills), on="patient_id", how="inner")
-    funnel.append(("R1 has a first fill", len(df)))
+    funnel.append(("Filled the drug at least once", len(df)))
     df = df[df.start <= df.index_date - days(rules.lookback)]
-    funnel.append((f"R2 enrolled {rules.lookback} days before", len(df)))
+    funnel.append((f"Insured {months(rules.lookback)} before first fill", len(df)))
     df = df[df.end >= df.index_date + days(rules.lookforward)]
-    funnel.append((f"R3 enrolled {rules.lookforward} days after", len(df)))
+    funnel.append((f"Insured {months(rules.lookforward)} after first fill" if rules.lookforward
+                   else "No insurance needed after first fill", len(df)))
     by_patient = dict(tuple(fills.groupby("patient_id")))
     out = [days_on_therapy(by_patient[r.patient_id], r.index_date, r.end, rules.gap) for r in df.itertuples()]
     df = df.assign(days_on=[o[0] for o in out], stopped=[o[1] for o in out])
