@@ -26,8 +26,12 @@ td:last-child{text-align:right}.now td{font-weight:600}
 .note{font-size:12px;color:var(--muted);margin:8px 0 0}
 .ask{display:flex;gap:8px}.ask input{flex:1;min-width:0;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit}
 .ask button{padding:8px 14px;border:0;border-radius:8px;background:var(--accent);color:#fff;font:inherit;cursor:pointer}
-.qa{margin-top:14px;font-size:14px}.qa b{display:block;margin-bottom:2px}
-.cite{display:inline-block;font-size:11px;padding:1px 6px;margin:4px 4px 0 0;border:1px solid var(--line);border-radius:6px;color:var(--muted)}
+.qa{margin-top:16px;font-size:14px;line-height:1.6}.qa>b{display:block;margin-bottom:4px}
+.ref{display:inline-block;min-width:15px;padding:0 4px;margin-left:3px;border-radius:8px;font-size:10px;line-height:15px;text-align:center;font-weight:600;color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,transparent);vertical-align:2px}
+.refs{font-size:12px;color:var(--muted);margin:8px 0 0;padding-left:18px}
+.declined{color:var(--muted)}
+.caret{display:inline-block;width:7px;height:14px;background:var(--accent);vertical-align:-2px;margin-left:2px;animation:blink 1s steps(2) infinite}
+@keyframes blink{50%{opacity:0}}
 </style>
 </head>
 <body>
@@ -140,19 +144,79 @@ $("ask").addEventListener("submit", async e => {
   if (!q) return;
   const box = document.createElement("div");
   box.className = "qa";
-  box.innerHTML = `<b>${esc(q)}</b><span class="note">Thinking…</span>`;
-  $("answers").prepend(box);
+  box.innerHTML = `<b>${esc(q)}</b><div class="body"><span class="note">Thinking…</span></div>`;
+  $("answers").append(box);
+  box.scrollIntoView({block: "nearest"});
   $("q").value = "";
+  const body = box.querySelector(".body");
   try {
     const res = await fetch("/ask", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({question: q, history: chat.slice(-6)})});
     if (!res.ok) throw new Error();
-    const r = await res.json();
-    chat.push([q, r.answer]);
-    box.innerHTML = `<b>${esc(q)}</b>${esc(r.answer)}<div>${r.citations.map(c => `<span class="cite">${esc(c)}</span>`).join("")}</div>`;
+    const reader = res.body.getReader(), dec = new TextDecoder();
+    let buf = "", text = "";
+    while (true) {
+      const {value, done} = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, {stream: true});
+      const lines = buf.split("\n");
+      buf = lines.pop();
+      for (const line of lines.filter(Boolean)) {
+        const m = JSON.parse(line);
+        if (m.delta) {
+          text += m.delta;
+          body.innerHTML = rich(text, [], null) + '<span class="caret"></span>';
+        } else if (m.done) {
+          const d = m.done;
+          chat.push([q, d.answer]);
+          body.innerHTML = `<div class="${d.declined ? "declined" : ""}">${rich(d.answer, [...d.citations], d.citations)}</div>`
+            + (d.citations.length ? `<ol class="refs">${d.citations.map(c => `<li>${esc(m.sources[c])}</li>`).join("")}</ol>` : "");
+          if (d.chart) answerChart(body, d.chart, m.sources);
+        }
+      }
+    }
   } catch {
-    box.innerHTML = `<b>${esc(q)}</b><span class="note">The assistant isn't running. Start it with <code>uv run uvicorn assistant.server:app</code> and open http://127.0.0.1:8000.</span>`;
+    body.innerHTML = `<span class="note">The assistant isn't running. Start it with <code>uv run uvicorn assistant.server:app</code> and open http://127.0.0.1:8000.</span>`;
   }
 });
+
+// Answer text with [ID] citations turned into numbered footnotes; once done, unknown IDs are dropped.
+function rich(text, order, known) {
+  return esc(text).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/\n+/g, "<br>")
+    .replace(/\[([\w-]+(?:\s*,\s*[\w-]+)*)\]/g, (_, g) => g.split(",").map(s => s.trim())
+      .filter(id => !known || known.includes(id))
+      .map(id => {
+        if (!order.includes(id)) order.push(id);
+        return `<span class="ref">${order.indexOf(id) + 1}</span>`;
+      }).join("")).replace(/<\/span>[\s,]*<span class="ref"/g, '</span><span class="ref"');
+}
+
+// Small chart under an answer: Kaplan-Meier curves for the cited runs, or one run's funnel.
+function answerChart(el, spec, sources) {
+  const runs = spec.runs.map(id => {
+    const [, g, b, f] = id.split("-").map(Number);
+    return {id, run: find(g, b, f)};
+  }).filter(r => r.run);
+  if (!runs.length) return;
+  const wrap = document.createElement("div");
+  wrap.style.cssText = "position:relative;height:200px;margin-top:10px";
+  const canvas = document.createElement("canvas");
+  wrap.append(canvas);
+  el.append(wrap);
+  const name = id => (sources[id] || id).replace(/^Result: /, "");
+  if (spec.kind === "funnel") {
+    const {id, run} = runs[0];
+    new Chart(canvas, {type: "bar",
+      data: {labels: run.funnel.map(f => f[0]), datasets: [{label: name(id), data: run.funnel.map(f => f[1]), backgroundColor: "#1D9E75"}]},
+      options: {indexAxis: "y", maintainAspectRatio: false, plugins: {legend: {display: false}, title: {display: true, text: name(id)}}}});
+  } else {
+    const colors = ["#1D9E75", "#534AB7", "#D85A30"];
+    new Chart(canvas, {type: "line",
+      data: {datasets: runs.map(({id, run}, i) => ({label: name(id), data: points(run, false), ...line(colors[i], [])}))},
+      options: {maintainAspectRatio: false, interaction: {mode: "nearest", axis: "x", intersect: false},
+        scales: {x: {type: "linear", min: 0, max: 365, title: {display: true, text: "Days since first fill"}},
+                 y: {min: 0, max: 100, title: {display: true, text: "% on therapy"}}}}});
+  }
+}
 
 ["gap", "lf", "lb", "field"].forEach(id => $(id).addEventListener("input", update));
 update();
