@@ -33,13 +33,13 @@ class Question(BaseModel):
 
 
 # The explorer page.
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 def page():
     return FileResponse(ROOT / "explorer" / "explorer.html")
 
 
 # The slide deck.
-@app.get("/deck")
+@app.api_route("/deck", methods=["GET", "HEAD"])
 def deck():
     return FileResponse(ROOT / "deck" / "deck.html")
 
