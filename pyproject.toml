@@ -6,3 +6,6 @@ dependencies = ["numpy", "pandas", "lifelines"]
 
 [dependency-groups]
 dev = ["pytest"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
