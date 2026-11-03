@@ -10,7 +10,7 @@ SPAN = (DATA_END - DATA_START).days
 
 # Simulates one patient as day offsets from DATA_START; None if they never appear in our data.
 def _patient(rng):
-    unstable = rng.random() < 0.35
+    unstable = rng.random() < 0.3
     start = int(rng.integers(-700, SPAN - 180))
     joined_late = rng.random() < 0.2
     enrol_from = start + int(rng.integers(-300, 200)) if joined_late else start - int(rng.integers(0, 1500))
@@ -20,13 +20,13 @@ def _patient(rng):
         return None
     if rng.random() < 0.12:
         return start, enrolment, []
-    stop = start + rng.weibull(0.7) * (120 if unstable else 600)
+    stop = start + rng.weibull(0.7) * (120 if unstable else 2000)
     supply = 90 if rng.random() < 0.15 else 30
-    pause_at = start + rng.uniform(0, stop - start) if rng.random() < 0.15 else None
+    pause_at = start + rng.uniform(0, min(stop - start, 300)) if rng.random() < 0.3 else None
     fills, day = [], start
     while day < stop:
         fills.append((day, supply))
-        day += supply + int(rng.integers(-5, 11))
+        day += supply + int(rng.exponential(10)) - 5
         if pause_at is not None and day > pause_at:
             day, pause_at = day + int(rng.integers(20, 90)), None
     return start, enrolment, [f for f in fills if enrolment[0] <= f[0] <= enrolment[1]]
@@ -64,6 +64,12 @@ def save(out="data", **kw):
     Path(out).mkdir(exist_ok=True)
     for name, df in zip(("fills", "enrolment", "prescriptions"), generate(**kw)):
         df.to_csv(Path(out) / f"{name}.csv", index=False)
+
+
+# Reads the three CSVs back with dates parsed.
+def load(folder="data"):
+    read = lambda name, *dates: pd.read_csv(Path(folder) / f"{name}.csv", parse_dates=list(dates))
+    return read("fills", "fill_date"), read("enrolment", "start", "end"), read("prescriptions", "written_date")
 
 
 if __name__ == "__main__":
