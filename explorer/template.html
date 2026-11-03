@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Persistence explorer</title>
+<style>
+:root{--ink:#1f1f1d;--muted:#6b6a65;--line:#e6e4dc;--bg:#faf9f5;--card:#fff;--accent:#1D9E75;--base:#a8a69e}
+@media(prefers-color-scheme:dark){:root{--ink:#ecebe6;--muted:#a3a19a;--line:#33322f;--bg:#1b1b1a;--card:#242422}}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.5 system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+main{max-width:1000px;margin:0 auto;padding:24px 16px}
+h1{font-size:22px;margin:0 0 4px}h2{font-size:14px;margin:18px 0 6px}
+.sub{color:var(--muted);margin:0 0 20px}
+.grid{display:grid;grid-template-columns:290px minmax(0,1fr);gap:16px}
+@media(max-width:760px){.grid{grid-template-columns:minmax(0,1fr)}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px}
+label{display:block;font-size:13px;color:var(--muted);margin-top:14px}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.val{float:right;font-weight:600;color:var(--ink)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.stats b{display:block;font-size:26px}.stats span{font-size:12px;color:var(--muted)}
+.bar{font-size:12px;margin:8px 0 0}.bar i{display:block;height:8px;background:var(--accent);border-radius:3px;margin-top:3px}
+table{width:100%;border-collapse:collapse;font-size:13px}td{padding:5px 0;border-bottom:1px solid var(--line)}
+td:last-child{text-align:right}.now td{font-weight:600}
+.note{font-size:12px;color:var(--muted);margin:8px 0 0}
+</style>
+</head>
+<body>
+<main>
+<h1>Six-month persistence explorer</h1>
+<p class="sub">Synthetic pharmacy claims for 5,000 patients. Change the cohort rules and see how the persistence curve moves. The grey line is the original method.</p>
+<div class="grid">
+  <div>
+    <div class="card">
+      <label>Allowed gap between fills (R4) <span class="val" id="gap-v"></span></label>
+      <input type="range" id="gap" min="0" max="2" step="1" value="1">
+      <label>Insurance needed after first fill (R3) <span class="val" id="lf-v"></span></label>
+      <input type="range" id="lf" min="0" max="2" step="1" value="2">
+      <label>Insurance needed before first fill (R2) <span class="val" id="lb-v"></span></label>
+      <input type="range" id="lb" min="0" max="2" step="1" value="1">
+      <label><input type="checkbox" id="field"> Include patients who never filled their prescription</label>
+    </div>
+    <div class="card">
+      <h2 style="margin-top:0">Patients kept after each rule</h2>
+      <div id="funnel"></div>
+    </div>
+  </div>
+  <div>
+    <div class="card stats">
+      <div><b id="km"></b><span>still on therapy at 6 months</span></div>
+      <div><b id="delta"></b><span>vs original method</span></div>
+      <div><b id="n"></b><span>patients in cohort</span></div>
+    </div>
+    <div class="card">
+      <div style="position:relative;height:320px"><canvas id="chart"></canvas></div>
+      <p class="note" id="naive"></p>
+    </div>
+    <div class="card">
+      <h2 style="margin-top:0">Change one rule at a time</h2>
+      <table id="oat"></table>
+    </div>
+  </div>
+</div>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+const DATA = __RESULTS__;
+const OPTS = {gap: [30, 60, 90], lf: [0, 182, 365], lb: [182, 365, 730]};
+const RULE = {gap: "Gap (R4)", lookforward: "Insurance after (R3)", lookback: "Insurance before (R2)"};
+const $ = id => document.getElementById(id);
+const months = d => d ? Math.round(d / 30.4) + " months" : "not required";
+const label = {gap: d => d + " days", lookforward: months, lookback: months};
+const pct = s => (s * 100).toFixed(1) + "%";
+const find = (gap, lb, lf) => DATA.runs.find(r => r.gap === gap && r.lookback === lb && r.lookforward === lf);
+const original = find(DATA.original.gap, DATA.original.lookback, DATA.original.lookforward);
+const keep = 1 - DATA.never_filled_share;
+
+// Curve points in percent; field view adds never-filled patients as stopping on day 0.
+const points = (run, field) => (field ? [{x: 0, y: 100}] : [])
+  .concat(run.curve.map(([d, s]) => ({x: d, y: +(s * 100 * (field ? keep : 1)).toFixed(1)})));
+
+const line = (color, dash) => ({borderColor: color, borderDash: dash, borderWidth: 2, pointRadius: 0, stepped: true, fill: false});
+const chart = new Chart($("chart"), {
+  type: "line",
+  data: {datasets: [
+    {label: "Original method", data: points(original, false), ...line("#a8a69e", [6, 4])},
+    {label: "Your rules", data: [], ...line("#1D9E75", [])},
+    {label: "6 months", data: [{x: 182, y: 0}, {x: 182, y: 100}], ...line("#d3d1c7", [2, 3]), stepped: false},
+  ]},
+  options: {
+    animation: {duration: 250}, maintainAspectRatio: false, interaction: {mode: "nearest", axis: "x", intersect: false},
+    scales: {x: {type: "linear", min: 0, max: 365, title: {display: true, text: "Days since first fill"}},
+             y: {min: 0, max: 100, title: {display: true, text: "% still on therapy"}}},
+    plugins: {legend: {labels: {filter: i => i.datasetIndex < 2}},
+              tooltip: {filter: i => i.datasetIndex < 2, callbacks: {title: i => "Day " + i[0].parsed.x}}},
+  },
+});
+
+// Reads the controls, finds the matching precomputed run and redraws everything.
+function update() {
+  const gap = OPTS.gap[$("gap").value], lf = OPTS.lf[$("lf").value], lb = OPTS.lb[$("lb").value];
+  const field = $("field").checked, run = find(gap, lb, lf);
+  const km = run.km_6m * (field ? keep : 1), diff = (km - original.km_6m) * 100;
+  $("gap-v").textContent = label.gap(gap);
+  $("lf-v").textContent = label.lookforward(lf);
+  $("lb-v").textContent = label.lookback(lb);
+  $("km").textContent = pct(km);
+  $("delta").textContent = (diff > 0 ? "+" : "") + diff.toFixed(1) + " pts";
+  $("n").textContent = run.patients.toLocaleString();
+  $("naive").textContent = `Without censoring (anyone whose insurance ended early counted as stopped) this would read ${pct(run.naive_6m)}.`
+    + (field ? ` Never-filled prescriptions (${pct(DATA.never_filled_share)}) are counted as stopping on day 0.` : "");
+  const top = run.funnel[0][1];
+  $("funnel").innerHTML = run.funnel.map(([name, n]) =>
+    `<div class="bar">${name}<span class="val">${n.toLocaleString()}</span><i style="width:${n / top * 100}%"></i></div>`).join("");
+  $("oat").innerHTML = DATA.one_at_a_time.map(r => {
+    const now = {gap, lookback: lb, lookforward: lf}[r.rule] === r.value;
+    return `<tr class="${now ? "now" : ""}"><td>${RULE[r.rule]}</td><td>${label[r.rule](r.value)}</td><td>${pct(r.km_6m)}</td></tr>`;
+  }).join("");
+  chart.data.datasets[1].data = points(run, field);
+  chart.update();
+}
+
+["gap", "lf", "lb", "field"].forEach(id => $(id).addEventListener("input", update));
+update();
+</script>
+</body>
+</html>
