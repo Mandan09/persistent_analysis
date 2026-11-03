@@ -44,7 +44,10 @@ td:last-child{text-align:right}.now td{font-weight:600;color:var(--accent)}td.ru
 .qa{margin-top:16px;font-size:14px;line-height:1.6}
 .qa>b{display:block;margin-bottom:4px;padding:8px 12px;border-radius:10px;background:var(--bg)}
 .ref{display:inline-block;min-width:15px;padding:0 4px;margin-left:3px;border-radius:8px;font-size:10px;line-height:15px;text-align:center;font-weight:600;color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,transparent);vertical-align:2px}
-.refs{font-size:12px;color:var(--muted);margin:8px 0 0;padding-left:18px}
+.ref{cursor:pointer}
+.refs{font-size:12px;color:var(--muted);margin:8px 0 0}.refs summary{cursor:pointer}
+.refs ol{padding-left:18px;margin:6px 0 0}.refs li{padding:4px 6px;border-radius:6px;margin-bottom:4px}
+.refs li b{color:var(--ink);font-weight:600}.refs li.hit{background:color-mix(in srgb,var(--accent) 12%,transparent)}
 .declined{color:var(--muted)}
 .caret{display:inline-block;width:7px;height:14px;background:var(--accent);vertical-align:-2px;margin-left:2px;animation:blink 1s steps(2) infinite}
 @keyframes blink{50%{opacity:0}}
@@ -242,7 +245,14 @@ $("ask").addEventListener("submit", async e => {
           const d = m.done;
           chat.push([q, d.answer]);
           body.innerHTML = `<div class="${d.declined ? "declined" : ""}">${rich(d.answer, [...d.citations], d.citations)}</div>`
-            + (d.citations.length ? `<ol class="refs">${d.citations.map(c => `<li>${esc(m.sources[c])}</li>`).join("")}</ol>` : "");
+            + (d.citations.length ? `<details class="refs"><summary>Sources (${d.citations.length})</summary><ol>${d.citations.map(c =>
+              `<li><b>${esc(m.sources[c].title)}</b><div>${esc(m.sources[c].text)}</div></li>`).join("")}</ol></details>` : "");
+          body.querySelectorAll(".ref").forEach(b => b.addEventListener("click", () => {
+            const li = body.querySelectorAll(".refs li")[+b.textContent - 1];
+            body.querySelector(".refs").open = true;
+            body.querySelectorAll(".refs li").forEach(x => x.classList.toggle("hit", x === li));
+            li.scrollIntoView({block: "nearest", behavior: "smooth"});
+          }));
           if (d.chart) answerChart(body, d.chart, m.sources);
         }
         scroll();
@@ -276,7 +286,7 @@ function answerChart(el, spec, sources) {
   const canvas = document.createElement("canvas");
   wrap.append(canvas);
   el.append(wrap);
-  const name = id => (sources[id] || id).replace(/^Result: /, "");
+  const name = id => (sources[id]?.title || id).replace(/^Result: /, "");
   if (spec.kind === "funnel") {
     const {id, run} = runs[0];
     new Chart(canvas, {type: "bar",

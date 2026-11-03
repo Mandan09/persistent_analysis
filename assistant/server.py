@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
-from assistant.agent import ROOT, labels, stream
+from assistant.agent import ROOT, details, stream
 
 app = FastAPI()
 
@@ -29,5 +29,5 @@ def answer(q: Question):
             if isinstance(part, str):
                 yield json.dumps({"delta": part}) + "\n"
             else:
-                yield json.dumps({"done": part.model_dump(), "sources": {c: labels()[c] for c in part.citations}}) + "\n"
+                yield json.dumps({"done": part.model_dump(), "sources": {c: details()[c] for c in part.citations}}) + "\n"
     return StreamingResponse(lines(), media_type="application/x-ndjson")

@@ -6,11 +6,11 @@ dependencies = [
     "numpy",
     "pandas",
     "lifelines",
-    "google-genai>=2.34.0",
     "python-dotenv>=1.2.4",
     "fastapi>=0.162.0",
     "uvicorn>=0.54.0",
     "pyyaml>=6.0.3",
+    "litellm>=1.106.6",
 ]
 
 [dependency-groups]
