@@ -7,4 +7,4 @@ RUN uv sync --frozen --no-dev
 COPY . .
 RUN python -m persistence.generate && python -m persistence.sensitivity && python -m explorer.build
 EXPOSE 8000
-CMD ["uvicorn", "assistant.server:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD uvicorn assistant.server:app --host 0.0.0.0 --port ${PORT:-8000}

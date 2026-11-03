@@ -1,0 +1,11 @@
+# Render Blueprint: New → Blueprint → pick this repo, then paste GEMINI_API_KEY once.
+services:
+  - type: web
+    name: persistence-analysis
+    runtime: docker
+    plan: free
+    region: singapore
+    healthCheckPath: /
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false
