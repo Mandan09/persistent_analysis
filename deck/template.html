@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Can we trust 68%?</title>
+<style>
+:root{--ink:#f3f2ee;--muted:#a3a19a;--bg:#161615;--card:#22221f;--line:#34332f;--accent:#2fbf8f;--warn:#e8875f}
+*{box-sizing:border-box}html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:18px/1.5 system-ui,sans-serif;overflow:hidden}
+.slide{position:absolute;inset:0;padding:6vh 7vw 10vh;display:flex;flex-direction:column;justify-content:center;opacity:0;transform:translateX(40px);transition:.45s;pointer-events:none}
+.slide.on{opacity:1;transform:none;pointer-events:auto}
+h1{font-size:clamp(34px,6vw,72px);line-height:1.05;margin:0 0 16px}h2{font-size:clamp(26px,3.6vw,44px);margin:0 0 20px}
+.kicker{color:var(--accent);font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-size:14px;margin-bottom:10px}
+.muted{color:var(--muted)}.big{font-size:clamp(56px,10vw,120px);font-weight:800;line-height:1}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px}
+.bar{margin:12px 0}.bar i{display:block;height:26px;border-radius:6px;background:var(--accent);width:0;transition:width 1s}
+.bar span{display:flex;justify-content:space-between;font-size:16px}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.chart{position:relative;height:46vh}
+nav{position:fixed;bottom:3vh;left:7vw;right:7vw;display:flex;align-items:center;gap:8px}
+nav b{flex:1;height:3px;background:var(--line);border-radius:2px;cursor:pointer}nav b.on{background:var(--accent)}
+nav span{color:var(--muted);font-size:14px;margin-left:10px}
+ul{margin:0;padding-left:22px}li{margin:8px 0}
+</style>
+</head>
+<body>
+<section class="slide">
+  <div class="kicker">Persistence analysis, rebuilt</div>
+  <h1>Can we trust 68%?</h1>
+  <p class="muted">Yes, as an answer to a narrow question. This deck shows which question, and what changes the answer. Use ← → to move.</p>
+</section>
+<section class="slide">
+  <h2>The problem</h2>
+  <div class="cols">
+    <div class="card"><div class="big">68%</div><p class="muted">of patients still on therapy at 6 months, reported 18 months ago</p></div>
+    <div class="card"><div class="big" style="color:var(--warn)">"sooner"</div><p class="muted">what the field team sees: patients stop much earlier</p></div>
+    <div class="card"><div class="big">0</div><p class="muted">pages of written method; the person who built it has left</p></div>
+  </div>
+</section>
+<section class="slide">
+  <h2>68% is a number about <span id="cohort"></span> patients</h2>
+  <p class="muted">Rebuilt on 5,000 synthetic patients with the original rules. Each rule removes patients before anyone is measured.</p>
+  <div id="funnel"></div>
+</section>
+<section class="slide">
+  <h2>One number hides when people stop</h2>
+  <p class="muted">Share still on therapy, day by day (Kaplan-Meier). Most drop-off happens when a supply runs out at day 30, 60 or 90.</p>
+  <div class="chart"><canvas id="curve"></canvas></div>
+</section>
+<section class="slide">
+  <h2>The break rule moves the number most</h2>
+  <p class="muted">How long can a patient go without medicine before we say they stopped? Drag it.</p>
+  <div class="cols" style="align-items:center">
+    <div><input type="range" id="gap" step="1"><p>Break allowed: <b id="gap-v"></b></p></div>
+    <div class="card"><div class="big" id="gap-km"></div><p class="muted" id="gap-d"></p></div>
+  </div>
+  <p class="muted">The other rules move it far less: insurance after first fill about 3 points, insurance before about 1 point, which is within the ±3-point noise of a 739-patient cohort.</p>
+</section>
+<section class="slide">
+  <h2>From 68% to the field team's view</h2>
+  <p class="muted">Same patients, three changes in how we count.</p>
+  <div id="steps"></div>
+</section>
+<section class="slide">
+  <h2>What we built</h2>
+  <div class="cols">
+    <div class="card"><b>Tested rules</b><p class="muted">The four rules in Python with 14 tests, one per edge case: exact 60-day breaks, 90-day fills, early refills, lost insurance.</p></div>
+    <div class="card"><b>Explorer</b><p class="muted">Sliders over 105 precomputed rule settings. The page only shows tested numbers.</p></div>
+    <div class="card"><b>Assistant</b><p class="muted">Answers from the written method only, with clickable sources. 97/97 on a stress test, about $0.009 a question.</p></div>
+  </div>
+</section>
+<section class="slide">
+  <h2>What to tell leadership</h2>
+  <ul>
+    <li><b>68% is right</b> for new, continuously insured patients who are allowed 60-day breaks.</li>
+    <li><b>It is not</b> "share of prescribed patients who stay on": with 30-day breaks and never-filled prescriptions it is nearer <b id="field"></b>.</li>
+    <li><b>Pick the rule that matches the decision</b>, and show the curve, not one point.</li>
+  </ul>
+  <p class="muted" style="margin-top:24px">Caveat: built on synthetic data. The next step is rerunning these exact rules on the real claims and reconciling with 68%.</p>
+</section>
+<nav id="nav"></nav>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+const DATA = __RESULTS__;
+const $ = id => document.getElementById(id), pct = s => (s * 100).toFixed(1) + "%";
+const run = (g, b, f) => DATA.runs.find(r => r.gap === g && r.lookback === b && r.lookforward === f);
+const base = run(60, 365, 365), keep = 1 - DATA.never_filled_share;
+const slides = [...document.querySelectorAll(".slide")];
+let at = 0;
+
+// Animated bars: rows of [label, value, max, text].
+const bars = (el, rows) => {
+  $(el).innerHTML = rows.map(([l, v, max, t]) => `<div class="bar"><span>${l}<b>${t}</b></span><i data-w="${v / max * 100}"></i></div>`).join("");
+};
+bars("funnel", base.funnel.map(([l, n]) => [l, n, 5000, n.toLocaleString()]));
+const g30 = run(30, 365, 365), g30lf0 = run(30, 365, 0);
+bars("steps", [["Original rules", base.km_6m, 1, pct(base.km_6m)], ["Break allowed: 30 days", g30.km_6m, 1, pct(g30.km_6m)],
+  ["…and no insurance needed after first fill", g30lf0.km_6m, 1, pct(g30lf0.km_6m)],
+  ["…and count never-filled prescriptions", g30lf0.km_6m * keep, 1, pct(g30lf0.km_6m * keep)]]);
+$("cohort").textContent = base.patients;
+$("field").textContent = Math.round(g30lf0.km_6m * keep * 100) + "%";
+
+const gaps = DATA.one_at_a_time.filter(o => o.rule === "gap");
+Object.assign($("gap"), {min: 0, max: gaps.length - 1, value: gaps.findIndex(o => o.value === 60)});
+$("gap").oninput = () => {
+  const o = gaps[$("gap").value], d = (o.km_6m - base.km_6m) * 100;
+  $("gap-v").textContent = o.value + " days";
+  $("gap-km").textContent = pct(o.km_6m);
+  $("gap-d").textContent = d ? `${d > 0 ? "+" : ""}${d.toFixed(1)} points vs the original 60 days` : "the original method";
+};
+$("gap").oninput();
+
+const line = (r, color, f = 1) => ({data: r.curve.map(([x, s]) => ({x, y: s * 100 * f})), borderColor: color, borderWidth: 3, pointRadius: 0, stepped: true});
+new Chart($("curve"), {type: "line", data: {datasets: [
+  {label: "Original rules", ...line(base, "#2fbf8f")}, {label: "30-day break", ...line(g30, "#e8875f")}]},
+  options: {maintainAspectRatio: false, color: "#a3a19a", scales: {x: {type: "linear", max: 365, ticks: {color: "#a3a19a"}, grid: {color: "#34332f"}},
+    y: {min: 0, max: 100, ticks: {color: "#a3a19a"}, grid: {color: "#34332f"}}}}});
+
+// Shows slide i, updates the progress bar and replays its bar animations.
+function go(i) {
+  at = Math.max(0, Math.min(slides.length - 1, i));
+  slides.forEach((s, j) => s.classList.toggle("on", j === at));
+  slides[at].querySelectorAll(".bar i").forEach(b => { b.style.width = 0; requestAnimationFrame(() => setTimeout(() => b.style.width = b.dataset.w + "%", 50)); });
+  $("nav").innerHTML = slides.map((_, j) => `<b class="${j <= at ? "on" : ""}" onclick="go(${j})"></b>`).join("") + `<span>${at + 1} / ${slides.length}</span>`;
+}
+addEventListener("keydown", e => {
+  if (["ArrowRight", "PageDown", " "].includes(e.key)) go(at + 1);
+  if (["ArrowLeft", "PageUp"].includes(e.key)) go(at - 1);
+});
+addEventListener("click", e => { if (!e.target.closest("input,nav,canvas")) go(at + (e.clientX > innerWidth / 3 ? 1 : -1)); });
+go(0);
+</script>
+</body>
+</html>

@@ -22,7 +22,7 @@ cp .env.example .env        # put your GEMINI_API_KEY in .env
 docker compose up --build
 ```
 
-Open http://localhost:8000. The build generates the data, runs the analysis and builds the page, so there is nothing else to set up. There is no database: the data is CSV files and the results are one JSON file, all rebuilt from a fixed seed.
+Open http://localhost:8000 for the explorer, or http://localhost:8000/deck for the 8-slide deck (use ← →). The build generates the data, runs the analysis and builds the page, so there is nothing else to set up. There is no database: the data is CSV files and the results are one JSON file, all rebuilt from a fixed seed.
 
 ### Without Docker
 
@@ -62,7 +62,8 @@ persistence/   generate.py     synthetic fills, insurance periods, prescriptions
                cohort.py       the four rules and the patient funnel
                survival.py     Kaplan-Meier curve
                sensitivity.py  105 rule settings into data/results.json
-explorer/      template.html   the page; build.py bakes the results into explorer.html
+explorer/      template.html   the page; build.py bakes the results into explorer.html and the deck
+deck/          template.html   8-slide interactive deck, built to deck.html
 assistant/     agent.py        prompt, sources, citation checks, model fallback
                server.py       serves the page and the streaming /ask endpoint
                questions.yaml  evaluation questions; evaluate.py runs them

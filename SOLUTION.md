@@ -202,7 +202,8 @@ A new VP has to present a 68% six-month persistence figure in five days. The per
 | `persistence/survival.py` | Kaplan-Meier fit, share at a day, curve points |
 | `persistence/sensitivity.py` | 105-setting grid, written to `data/results.json` (`python -m persistence.sensitivity`) |
 | `explorer/template.html` | Explorer page source |
-| `explorer/build.py` | Bakes `results.json` into `explorer/explorer.html` |
+| `explorer/build.py` | Bakes `results.json` into `explorer/explorer.html` and `deck/deck.html` |
+| `deck/template.html`, `deck/deck.html` | 8-slide interactive deck with an interactive gap slider; served at `/deck` |
 | `explorer/explorer.html` | Built explorer; opens without a server (the chat needs the server) |
 | `assistant/agent.py` | Prompt, sources, citation checks, streaming, model fallback |
 | `assistant/server.py` | FastAPI app: serves the explorer and the streaming `/ask` endpoint |

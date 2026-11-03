@@ -21,6 +21,12 @@ def page():
     return FileResponse(ROOT / "explorer" / "explorer.html")
 
 
+# The slide deck.
+@app.get("/deck")
+def deck():
+    return FileResponse(ROOT / "deck" / "deck.html")
+
+
 # Streams the answer as JSON lines: text deltas, then the checked reply with source titles.
 @app.post("/ask")
 def answer(q: Question):
