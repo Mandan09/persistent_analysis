@@ -11,6 +11,8 @@ It has four parts:
 
 **What it shows:** the rule for how long a break between refills is allowed moves the number most. Allow 60 days and it is 70%. Allow 30 and it falls to 58%. Add the patients who were prescribed the drug but never filled it, and it lands near 48%. The 68% and the field team's view are both reasonable; they count different patients with different rules.
 
+**Live:** https://persistence-analysis.onrender.com (explorer and assistant) · https://persistence-analysis.onrender.com/deck (slides). It runs on Render's free tier, so after a quiet spell the first load can take about a minute.
+
 ## Getting started
 
 You need a Gemini API key for the assistant. Everything else runs without one.
