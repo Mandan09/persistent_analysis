@@ -2,7 +2,16 @@
 name = "persistence-analysis"
 version = "0.1.0"
 requires-python = ">=3.11"
-dependencies = ["numpy", "pandas", "lifelines"]
+dependencies = [
+    "numpy",
+    "pandas",
+    "lifelines",
+    "google-genai>=2.34.0",
+    "python-dotenv>=1.2.4",
+    "fastapi>=0.162.0",
+    "uvicorn>=0.54.0",
+    "pyyaml>=6.0.3",
+]
 
 [dependency-groups]
 dev = ["pytest"]

@@ -24,6 +24,10 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 table{width:100%;border-collapse:collapse;font-size:13px}td{padding:5px 0;border-bottom:1px solid var(--line)}
 td:last-child{text-align:right}.now td{font-weight:600}
 .note{font-size:12px;color:var(--muted);margin:8px 0 0}
+.ask{display:flex;gap:8px}.ask input{flex:1;min-width:0;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit}
+.ask button{padding:8px 14px;border:0;border-radius:8px;background:var(--accent);color:#fff;font:inherit;cursor:pointer}
+.qa{margin-top:14px;font-size:14px}.qa b{display:block;margin-bottom:2px}
+.cite{display:inline-block;font-size:11px;padding:1px 6px;margin:4px 4px 0 0;border:1px solid var(--line);border-radius:6px;color:var(--muted)}
 </style>
 </head>
 <body>
@@ -59,6 +63,11 @@ td:last-child{text-align:right}.now td{font-weight:600}
     <div class="card">
       <h2 style="margin-top:0">Change one rule at a time</h2>
       <table id="oat"></table>
+    </div>
+    <div class="card">
+      <h2 style="margin-top:0">Ask about the method</h2>
+      <form id="ask" class="ask"><input id="q" maxlength="1000" placeholder="Why do we need a year of insurance after the first fill?"><button>Ask</button></form>
+      <div id="answers"></div>
     </div>
   </div>
 </div>
@@ -120,6 +129,28 @@ function update() {
   chart.data.datasets[1].data = points(run, field);
   chart.update();
 }
+
+const esc = s => s.replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"})[c]);
+
+// Sends the question to the assistant server and shows the answer with its sources.
+$("ask").addEventListener("submit", async e => {
+  e.preventDefault();
+  const q = $("q").value.trim();
+  if (!q) return;
+  const box = document.createElement("div");
+  box.className = "qa";
+  box.innerHTML = `<b>${esc(q)}</b><span class="note">Thinking…</span>`;
+  $("answers").prepend(box);
+  $("q").value = "";
+  try {
+    const res = await fetch("/ask", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({question: q})});
+    if (!res.ok) throw new Error();
+    const r = await res.json();
+    box.innerHTML = `<b>${esc(q)}</b>${esc(r.answer)}<div>${r.citations.map(c => `<span class="cite">${esc(c)}</span>`).join("")}</div>`;
+  } catch {
+    box.innerHTML = `<b>${esc(q)}</b><span class="note">The assistant isn't running. Start it with <code>uv run uvicorn assistant.server:app</code> and open http://127.0.0.1:8000.</span>`;
+  }
+});
 
 ["gap", "lf", "lb", "field"].forEach(id => $(id).addEventListener("input", update));
 update();
